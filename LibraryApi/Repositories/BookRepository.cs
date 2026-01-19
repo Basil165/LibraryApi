@@ -30,7 +30,7 @@ public class BookRepository : IBookRepository
             query = query.Where(b => b.Title.Contains(search) || b.Author.Contains(search));
         }
 
-        // simple pagination
+        //  pagination
         pageNumber = pageNumber < 1 ? 1 : pageNumber;
         pageSize = pageSize < 1 ? 10 : pageSize;
         pageSize = pageSize > 100 ? 100 : pageSize;
