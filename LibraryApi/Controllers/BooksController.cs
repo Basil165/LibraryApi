@@ -13,11 +13,16 @@ public class BooksController : ControllerBase
 {
     private readonly IBookRepository _repo;
     private readonly ILogger<BooksController> _logger;
+    private readonly IConfiguration _config;
 
-    public BooksController(IBookRepository repo, ILogger<BooksController> logger)
+    public BooksController(
+        IBookRepository repo,
+        ILogger<BooksController> logger,
+        IConfiguration config)
     {
         _repo = repo;
         _logger = logger;
+        _config = config;
     }
 
     // Add a new book
@@ -52,18 +57,36 @@ public class BooksController : ControllerBase
 
 
     // Retrieve all books (with optional search & pagination)
+    
     [HttpGet]
     public async Task<ActionResult<List<BookReadDto>>> GetAll(
-        [FromQuery] string? search,
-        [FromQuery] int pageNumber = 1,
-        [FromQuery] int pageSize = 10)
+    [FromQuery] string? search,
+    [FromQuery] int? pageNumber,
+    [FromQuery] int? pageSize)
     {
+        var defaultPageNumber = _config.GetValue<int>("Paging:DefaultPageNumber");
+        var defaultPageSize = _config.GetValue<int>("Paging:DefaultPageSize");
+        var maxPageSize = _config.GetValue<int>("Paging:MaxPageSize");
+
+        var page = pageNumber ?? defaultPageNumber;
+        var size = pageSize ?? defaultPageSize;
+
         _logger.LogInformation(
             "GET /api/books called. Search={Search}, Page={PageNumber}, Size={PageSize}",
-            search, pageNumber, pageSize
+            search, page, size
         );
 
-        var books = await _repo.GetAllAsync(search, pageNumber, pageSize);
+        if (page < 1)
+            return BadRequest(new { message = "pageNumber must be greater than 0." });
+
+        if (size < 1 || size > maxPageSize)
+            return BadRequest(new { message = $"pageSize must be between 1 and {maxPageSize}." });
+
+        if (search != null && search.Length > 100)
+            return BadRequest(new { message = "Search term is too long." });
+
+        var books = await _repo.GetAllAsync(search, page, size);
+
         var result = books
             .Select(b => new BookReadDto(b.Id, b.Title, b.Author, b.ISBN, b.PublishedDate))
             .ToList();
@@ -72,6 +95,7 @@ public class BooksController : ControllerBase
 
         return Ok(result);
     }
+
 
     // Retrieve a single book by Id
     [HttpGet("{id:int}")]
